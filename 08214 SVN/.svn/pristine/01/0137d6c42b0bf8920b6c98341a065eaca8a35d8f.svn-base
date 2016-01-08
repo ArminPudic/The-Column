@@ -1,0 +1,602 @@
+﻿using Labs.Utility;
+using OpenTK;
+using OpenTK.Graphics;
+using OpenTK.Graphics.OpenGL;
+using System;
+using System.Collections.Generic;
+using System.Drawing;
+using System.Drawing.Imaging;
+using System.IO;
+using System.Linq;
+using System.Text;
+
+namespace Labs.ACW
+{
+    public class ACWWindow : GameWindow
+    {
+        Globals global = new Globals();
+
+        public ACWWindow()
+            : base(
+                800, // Width
+                600, // Height
+                GraphicsMode.Default,
+                "Assessed Coursework",
+                GameWindowFlags.Default,
+                DisplayDevice.Default,
+                3, // major
+                3, // minor
+                GraphicsContextFlags.ForwardCompatible
+                )
+        {
+        }
+
+        public enum cameraTypes
+        {
+            freeMode = 1,
+            scrollingCam = 2,
+            staticCam = 3,
+            followCam = 4
+        };
+
+        /// <summary>
+        /// All the initial loading that is done at the start of the program. Called by OnLoad()
+        /// </summary>
+        public void initProgram()
+        {
+            
+            global.lastMousePos = new Vector2(Mouse.X, Mouse.Y);
+
+            GL.GenBuffers(1, out global.ibo_elements);
+
+            // These add the shaders to the shader dictionary. Currently have the default shader and a shader used for texturing.
+            global.shaders.Add("default", new ShaderProgram(@"ACW/Shaders/vs.glsl", @"ACW/Shaders/fs.glsl", true));
+            global.shaders.Add("textured", new ShaderProgram(@"ACW/Shaders/vs_tex.glsl", @"ACW/Shaders/fs_tex.glsl", true));
+
+            global.activeShader = "textured";
+
+            #region Loading in Textures
+            // Simply adds textures files from the Textures folder to the textures dictionary
+            global.textures.Add("dark_wood.png", loadImage(@"ACW/Textures/dark_wood.png"));
+            global.textures.Add("deathball.png", loadImage(@"ACW/Textures/deathball.png"));
+            global.textures.Add("sphere_texture.png", loadImage(@"ACW/Textures/sphere_texture.png"));
+            global.textures.Add("blue.png", loadImage(@"ACW/Textures/BasicTextures/blue.png"));
+            global.textures.Add("red.png", loadImage(@"ACW/Textures/BasicTextures/red.png"));
+            global.textures.Add("orange.png", loadImage(@"ACW/Textures/BasicTextures/orange.png"));
+            global.textures.Add("green.png", loadImage(@"ACW/Textures/BasicTextures/green.png"));
+
+            #region Super Secret Texture
+            global.textures.Add("SimonFace.png", loadImage(@"ACW/Textures/SuperSecretTextures/SimonFace.png"));
+            #endregion
+            #endregion
+
+            #region Loading in Cubes
+            // These are the four cubes in the program
+            TexturedCubeNoFloor tc = new TexturedCubeNoFloor(); // Creating the object
+            tc.TextureID = global.textures["blue.png"]; // Assigning a texture
+            tc.originalTexture = global.textures["blue.png"];
+            tc.Position = new Vector3(0f, 0f, 0f); // Setting it's position
+            tc.Scale = new Vector3(1f, 1f, 1f); // Setting it's scale
+            global.objects.Add(tc); // Adding it to the objects list. (NOTE: There is also a rotation funcition that is not used here as it was unnecessary)
+            global.cubes.Add(tc);
+
+            TexturedCubeNoCeilingAndFloor tc2 = new TexturedCubeNoCeilingAndFloor();
+            tc2.TextureID = global.textures["red.png"];
+            tc2.originalTexture = global.textures["red.png"];
+            tc2.Position = new Vector3(0f, -1f, 0f);
+            tc2.Scale = new Vector3(1f, 1f, 1f);
+            global.objects.Add(tc2);
+            global.cubes.Add(tc2);
+
+            TexturedCubeNoCeilingAndFloor tc3 = new TexturedCubeNoCeilingAndFloor();
+            tc3.TextureID = global.textures["red.png"];
+            tc3.originalTexture = global.textures["red.png"];
+            tc3.Position = new Vector3(0f, -2f, 0f);
+            tc3.Scale = new Vector3(1f, 1f, 1f);
+            global.objects.Add(tc3);
+            global.cubes.Add(tc3);
+
+            TexturedCubeNoCeilingAndFloor tc4 = new TexturedCubeNoCeilingAndFloor();
+            tc4.TextureID = global.textures["orange.png"];
+            tc4.originalTexture = global.textures["orange.png"];
+            tc4.Position = new Vector3(0f, -3f, 0f);
+            tc4.Scale = new Vector3(1f, 1f, 1f);
+            global.objects.Add(tc4);
+            global.cubes.Add(tc4);
+
+            TexturedCubeNoCeiling tc5 = new TexturedCubeNoCeiling();
+            tc5.TextureID = global.textures["green.png"];
+            tc5.originalTexture = global.textures["green.png"];
+            tc5.Position = new Vector3(0f, -4f, 0f);
+            tc5.Scale = new Vector3(1f, 1f, 1f);
+            global.objects.Add(tc5);
+            global.cubes.Add(tc5);
+            #endregion
+
+            #region Loading in Deathball
+            // The deathball uses a sphere model object so instead loads the object then applies the standard functions
+            CreateDeathball deathBall = new CreateDeathball(global.deathBallPos, global.deathBallScale, global.textures["deathball.png"], ref global.objects);
+            #endregion
+
+            #region Loading in Cylinders
+            // Same as Deathball (uses objects) only with cylinder instead and with rotation
+            CreateCylinder cylinder1 = new CreateCylinder(new Vector3(0.475f, -1f, -0.25f), new Vector3(0.05f, 0.475f, 0.05f), new Vector3(0f, 0f, 1.57079633f), global.textures["dark_wood.png"], ref global.objects, ref global.Xcylinders);
+            CreateCylinder cylinder2 = new CreateCylinder(new Vector3(0.475f, -1f, 0.25f), new Vector3(0.05f, 0.475f, 0.05f), new Vector3(0f, 0f, 1.57079633f), global.textures["dark_wood.png"], ref global.objects, ref global.Xcylinders);
+            CreateCylinder cylinder3 = new CreateCylinder(new Vector3(0.25f, -1f, -0.475f), new Vector3(0.05f, 0.475f, 0.05f), new Vector3(1.57079633f, 0f, 1.57079633f), global.textures["dark_wood.png"], ref global.objects, ref global.Zcylinders);
+            CreateCylinder cylinder4 = new CreateCylinder(new Vector3(-0.45f, -2f, -0.45f), new Vector3(0.1f, 0.6f, 0.1f), new Vector3(1.57079633f * 1.5f, 0f, 1.57079633f), global.textures["dark_wood.png"], ref global.objects, ref global.Xcylinders);
+            CreateCylinder cylinder5 = new CreateCylinder(new Vector3(0.45f, -2f, -0.45f), new Vector3(0.05f, 0.6f, 0.05f), new Vector3(1.57079633f / 2, 0f, 1.57079633f), global.textures["dark_wood.png"], ref global.objects, ref global.Xcylinders);
+            CreateCylinder cylinder6 = new CreateCylinder(new Vector3(-0.15f, -1f, -0.475f), new Vector3(0.1f, 0.475f, 0.1f), new Vector3(1.57079633f, 0f, 1.57079633f), global.textures["dark_wood.png"], ref global.objects, ref global.Zcylinders);
+            #endregion
+
+            #region Loading in Balls
+            // Lastly the balls are loaded in the same way as the deathball and cylinders
+            for (int i = 0; i < global.smallBallCount; i++)
+            {
+                CreateBall ball = new CreateBall(global.rnd, new Vector3(0.05f, 0.05f, 0.05f), global.textures["sphere_texture.png"], ref global.objects, ref global.balls);
+            }
+
+            for (int i = 0; i < global.bigBallCount; i++)
+            {
+                CreateBall ball = new CreateBall(global.rnd, new Vector3(0.075f, 0.075f, 0.075f), global.textures["sphere_texture.png"], ref global.objects, ref global.balls);
+            }
+            #endregion
+
+            global.cam.Position += new Vector3(0f, -2f, 3f);
+
+            #region Quick user guide
+            Console.WriteLine("Use the mouse to look");
+            Console.WriteLine("Use the following keys to move:");
+            Console.WriteLine("W = Forward");
+            Console.WriteLine("S = Backward");
+            Console.WriteLine("A = Left (strafe)");
+            Console.WriteLine("D = Right (strafe)");
+            Console.WriteLine("SPACE = Up");
+            Console.WriteLine("C = Down");
+            Console.WriteLine("\nUse the following keys to change the camera:");
+            Console.WriteLine("1 = Free Mode Camera");
+            Console.WriteLine("2 = Scrolling Camera");
+            Console.WriteLine("3 = Static Camera");
+            Console.WriteLine("4 = Follow Camera");
+            Console.WriteLine("\nWhatever you do, don't press 't'");
+            Console.WriteLine("If you do press 't' then press 'y' to bring everything back to normal");
+            #endregion
+        }
+
+        /// <summary>
+        /// OnLoad function called at the start, however, majority of loading code is in initProgram()
+        /// </summary>
+        /// <param name="e"></param>
+        protected override void OnLoad(EventArgs e)
+        {
+            base.OnLoad(e);
+            global.mTimer.Start(); // Starting a timer here, uses the standard timer class from the labs
+
+            GL.Enable(EnableCap.DepthTest);
+            GL.Enable(EnableCap.CullFace);
+
+            initProgram(); // This function is where everything is loaded. See initProgram()
+
+            global.shaders[global.activeShader].EnableVertexAttribArrays(); // Enables the vertex arrays using the currently active shader
+
+            foreach (Objects v in global.objects) // This gets all the verticies, indicies, colours coordinates and texture coordinates of every object
+            {
+                global.verts.AddRange(v.GetVerts().ToList());
+                global.inds.AddRange(v.GetIndices(global.vertcount).ToList());
+                global.colors.AddRange(v.GetColorData().ToList());
+                global.vertcount += v.VertCount;
+                global.texcoords.AddRange(v.GetTextureCoords());
+            }
+
+            global.vertdata = global.verts.ToArray();
+            global.indicedata = global.inds.ToArray();
+            global.coldata = global.colors.ToArray();
+            global.texcoorddata = global.texcoords.ToArray();
+
+            // The following is the standard binding buffers and GL stuff using the currently active shader and the data gained from above
+            GL.BindBuffer(BufferTarget.ArrayBuffer, global.shaders[global.activeShader].GetBuffer("vPosition"));
+
+            GL.BufferData<Vector3>(BufferTarget.ArrayBuffer, (IntPtr)(global.vertdata.Length * Vector3.SizeInBytes), global.vertdata, BufferUsageHint.StaticDraw);
+            GL.VertexAttribPointer(global.shaders[global.activeShader].GetAttribute("vPosition"), 3, VertexAttribPointerType.Float, false, 0, 0);
+
+            if (global.shaders[global.activeShader].GetAttribute("vColor") != -1)
+            {
+                GL.BindBuffer(BufferTarget.ArrayBuffer, global.shaders[global.activeShader].GetBuffer("vColor"));
+                GL.BufferData<Vector3>(BufferTarget.ArrayBuffer, (IntPtr)(global.coldata.Length * Vector3.SizeInBytes), global.coldata, BufferUsageHint.StaticDraw);
+                GL.VertexAttribPointer(global.shaders[global.activeShader].GetAttribute("vColor"), 3, VertexAttribPointerType.Float, true, 0, 0);
+            }
+
+            if (global.shaders[global.activeShader].GetAttribute("texcoord") != -1)
+            {
+                GL.BindBuffer(BufferTarget.ArrayBuffer, global.shaders[global.activeShader].GetBuffer("texcoord"));
+                GL.BufferData<Vector2>(BufferTarget.ArrayBuffer, (IntPtr)(global.texcoorddata.Length * Vector2.SizeInBytes), global.texcoorddata, BufferUsageHint.StaticDraw);
+                GL.VertexAttribPointer(global.shaders[global.activeShader].GetAttribute("texcoord"), 2, VertexAttribPointerType.Float, true, 0, 0);
+            }
+
+            GL.ClearColor(Color4.Black);
+            GL.PointSize(5f);
+        }
+
+        /// <summary>
+        /// This function is quite self-explanatory, it takes a BitMap image, creates a texture and loads it into the program
+        /// </summary>
+        /// <param name="image"></param>
+        /// <returns>texID - The ID of the texture loaded</returns>
+        public int loadImage(Bitmap image)
+        {
+            int texID = GL.GenTexture();
+
+            GL.BindTexture(TextureTarget.Texture2D, texID);
+            BitmapData data = image.LockBits(new System.Drawing.Rectangle(0, 0, image.Width, image.Height), // Locking the image into system memory
+                ImageLockMode.ReadOnly, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
+
+            GL.TexImage2D(TextureTarget.Texture2D, 0, PixelInternalFormat.Rgba, data.Width, data.Height, 0, // Making the 2D image into a usable texture
+                OpenTK.Graphics.OpenGL.PixelFormat.Bgra, PixelType.UnsignedByte, data.Scan0);
+
+            image.UnlockBits(data);
+
+            GL.GenerateMipmap(GenerateMipmapTarget.Texture2D); // Generating a mipmap from the texture to save on resources
+
+            return texID;
+        }
+
+        /// <summary>
+        /// This is the override function that is initially called when loading a texture
+        /// </summary>
+        /// <param name="filename"></param>
+        /// <returns>loadImage(file) - This equals the texture ID see loadImage(Bitmap image) above</returns>
+        public int loadImage(string filename)
+        {
+            try
+            {
+                Bitmap file = new Bitmap(filename); // It takes in the filename and creates a BitMap of the image
+                return loadImage(file); // then this sends it to be created into a texture and returns that back to the list
+            }
+            catch (FileNotFoundException e)
+            {
+                return -1;
+            }
+        }
+
+        /// <summary>
+        /// This function sets the viewport and field of view whenever the window is resized. All is default except minor in projection
+        /// </summary>
+        /// <param name="e"></param>
+        protected override void OnResize(EventArgs e)
+        {
+            base.OnResize(e);
+
+            GL.Viewport(ClientRectangle.X, ClientRectangle.Y, ClientRectangle.Width, ClientRectangle.Height);
+
+            Matrix4 projection = Matrix4.CreatePerspectiveFieldOfView((float)Math.PI / 4, Width / (float)Height, 0.01f, 64.0f);
+
+            GL.MatrixMode(MatrixMode.Projection);
+
+            GL.LoadMatrix(ref projection);
+        }
+
+        /// <summary>
+        /// This function renders and draws each of the objects every frame
+        /// </summary>
+        /// <param name="e"></param>
+        protected override void OnRenderFrame(FrameEventArgs e)
+        {
+            base.OnRenderFrame(e);
+
+            GL.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
+
+            int indiceAt = 0;
+
+            foreach (Objects v in global.objects) // This foreach loop loops through each object and renders them
+            {
+                GL.BindTexture(TextureTarget.Texture2D, v.TextureID);
+                GL.UniformMatrix4(global.shaders[global.activeShader].GetUniform("modelview"), false, ref v.ModelViewProjectionMatrix);
+
+                if (global.shaders[global.activeShader].GetAttribute("maintexture") != -1)
+                {
+                    GL.Uniform1(global.shaders[global.activeShader].GetAttribute("maintexture"), v.TextureID);
+                }
+
+                GL.DrawElements(PrimitiveType.Triangles, v.IndiceCount, DrawElementsType.UnsignedInt, indiceAt * sizeof(uint));
+                indiceAt += v.IndiceCount;
+            }
+
+            GL.Flush();
+
+            SwapBuffers();
+        }
+
+        /// <summary>
+        /// This function handles all the important key presses that are used to move the camera
+        /// </summary>
+        /// <param name="e"></param>
+        protected override void OnKeyPress(KeyPressEventArgs e)
+        {
+            base.OnKeyPress(e);
+
+            if (e.KeyChar == 27) // ESC
+            {
+                Exit();
+            }
+
+            switch (e.KeyChar)
+            {
+                #region Camera Movement
+                case 'w': // Forward
+                    global.cam.Move(0f, 0.05f, 0f);
+                    break;
+                case 'a': // Left (strafe)
+                    global.cam.Move(-0.05f, 0f, 0f);
+                    break;
+                case 's': // Backward
+                    global.cam.Move(0f, -0.05f, 0f);
+                    break;
+                case 'd': // Right (strafe)
+                    global.cam.Move(0.05f, 0f, 0f);
+                    break;
+                case ' ': // Up (spacebar)
+                    global.cam.Move(0f, 0f, 0.05f);
+                    break;
+                case 'c': // Down
+                    global.cam.Move(0f, 0f, -0.05f);
+                    break;
+                #endregion
+
+                #region Camera Selection
+                case '1': // Free Cam
+                    global.camera = (int)cameraTypes.freeMode;
+                    break;
+                case '2': // Scrolling Cam
+                    global.camera = (int)cameraTypes.scrollingCam;
+                    break;
+                case '3': // Static Cam
+                    global.camera = (int)cameraTypes.staticCam;
+                    break;
+                case '4': // Follow cam
+                    global.camera = (int)cameraTypes.followCam;
+                    break;
+                #endregion
+
+                #region Super Secret Key Presses
+                case 't':
+                    {
+                        foreach (Objects v in global.cubes)
+                        {
+                            v.TextureID = global.textures["SimonFace.png"];
+                        }
+                        break;
+                    }
+
+                case 'y':
+                    {
+                        foreach (Objects v in global.cubes)
+                        {
+                            v.TextureID = v.originalTexture;
+                        }
+                        break;
+                    }
+                #endregion
+            }
+        }
+
+        /// <summary>
+        /// Simple function that resets the mouse cursor back to the centre of the window
+        /// </summary>
+        public void ResetCursor()
+        {
+            OpenTK.Input.Mouse.SetPosition(Bounds.Left + Bounds.Width / 2, Bounds.Top + Bounds.Height / 2);
+            global.lastMousePos = new Vector2(OpenTK.Input.Mouse.GetState().X, OpenTK.Input.Mouse.GetState().Y);
+        }
+
+        /// <summary>
+        /// Another simple function that checks if the mouse has moved and if so resets it's position. See ResetCursor()
+        /// </summary>
+        /// <param name="e"></param>
+        protected override void OnFocusedChanged(EventArgs e)
+        {
+            base.OnFocusedChanged(e);
+
+            if (Focused)
+            {
+                ResetCursor();
+            }
+        }
+
+        /// <summary>
+        /// This fundamental function updates all the data of everything that needs updating, every frame
+        /// </summary>
+        /// <param name="e"></param>
+        
+        protected override void OnUpdateFrame(FrameEventArgs e)
+        {
+            base.OnUpdateFrame(e);
+
+            #region Camera types
+            switch (global.camera)
+            {
+                case 1:
+                    break;
+                case 2:
+                    {
+                        global.cam.Scrolling();
+                        break;
+                    }
+                case 3:
+                    {
+                        global.cam.StaticCam();
+                        break;
+                    }
+                case 4:
+                    {
+                        global.cam.FollowingCam(global.PrevBallPos);
+                        break;
+                    }
+            }
+            #endregion
+
+            if (Focused && global.camera == 1) // This checks to see if the mouse has moved and if so it calculates the delta and updates the view. Afterwards it resets the mouse to the centre
+            {
+                Vector2 delta = global.lastMousePos - new Vector2(OpenTK.Input.Mouse.GetState().X, OpenTK.Input.Mouse.GetState().Y);
+
+                global.cam.AddRotation(delta.X, delta.Y);
+                ResetCursor();
+            }
+
+            float timestep = global.mTimer.GetElapsedSeconds();
+            foreach (Objects v in global.balls) // This is where the fun happens. All the update calulcations for the balls are here
+            {
+                global.PrevBallPos = v.Position;
+                
+                v.Velocity = v.Velocity + global.accelerationDueToGravity * timestep; // Setting the ball's velocity to a constant gravity multiplied by the time that is elapsed
+                v.Position = v.Position + (v.Velocity * timestep); // Then setting the ball's position based on this velocity
+
+                #region Random Velocity and Positions
+                // These are random velocities and positions that are set for each ball
+                global.speedX = global.rnd.Next(-40, 41); // This is 100x the normal speed, this is so that there is more variety in the random number
+                global.speedX = global.speedX / 100; // Once divided by 100 it's far more varying than simple -0.2 to 0.2
+                global.speedY = global.rnd.Next(-40, 41);
+                global.speedY = global.speedY / 100;
+                global.speedZ = global.rnd.Next(-40, 41);
+                global.speedZ = global.speedZ / 100;
+                #endregion
+
+                #region Ball Collisions
+                // Handles ball to ball collisions
+                foreach (Objects b in global.balls)
+                {
+                    if (b != v)
+                    {
+                        global.ballCollisionVector = b.Position - v.Position; // Calculates the standard ball collision vector as used in lab 4_1 and 4_2
+                        global.ballCollisionVector2 = v.Position - b.Position;
+                        if (global.ballCollisionVector.Length <= (b.Scale.Length + v.Scale.Length) * 1.2f)
+                        {
+                            global.normal = (global.ballCollisionVector).Normalized();
+                            global.normal2 = (global.ballCollisionVector2).Normalized();
+                            v.Velocity = v.Velocity - 2 * Vector3.Dot(global.normal, v.Velocity) * global.normal;
+                            b.Velocity = b.Velocity - 2 * Vector3.Dot(global.normal2, b.Velocity) * global.normal2;
+                        }
+                    }
+                }
+                #endregion
+
+                #region Cylinder Collisions
+                // Calulates all the cylinder collisions...Yipee
+                foreach (Objects c in global.Xcylinders) // Handling collisions for all the X-axis aligned cylinders
+                {
+                    // This calculation takes the position of the cylinder and then calculates the position of the two ends by adding and minusing to it's aligned axis by half of the scale of the cylinder
+                    global.L1 = Vector3.Transform(new Vector3(0, 0, 0), c.ModelMatrix); // The lower point of the cylinder
+                    global.L2 = Vector3.Transform(new Vector3(0, 0.6f, 0), c.ModelMatrix); // The upper point of the cylinder
+
+                    // From there it's the standard collision calculation
+                    global.normal2 = (global.L2 - global.L1).Normalized();
+                    global.A = Vector3.Dot(v.Position - global.L2, global.normal2) * global.normal2;
+                    global.F = global.L2 + global.A - v.Position;
+
+                    if (global.F.Length <= (c.Scale.Length / 22) + v.Scale.Length) // Then standard collision response (0.075 is the radius of the cylinder + the radius of the ball)
+                    {
+                        v.Position = global.PrevBallPos;
+                        v.Velocity = (v.Velocity - 2 * Vector3.Dot(global.F.Normalized(), v.Velocity) * global.F.Normalized());
+                    }
+                }
+                foreach (Objects c in global.Zcylinders) // Handling collisions for all the Z-axis aligned cylinders
+                {
+                    global.L1 = new Vector3(c.Position.X, c.Position.Y, c.Position.Z - (0.475f / 2));
+                    global.L2 = new Vector3(c.Position.X, c.Position.Y, c.Position.Z + (0.475f / 2));
+
+                    global.normal2 = (global.L2 - global.L1).Normalized();
+                    global.A = Vector3.Dot(v.Position - global.L2, global.normal2) * global.normal2;
+                    global.F = global.L2 + global.A - v.Position;
+
+                    if (global.F.Length <= (c.Scale.Length / 22) + v.Scale.Length)
+                    {
+                        v.Position = global.PrevBallPos;
+                        v.Velocity = (v.Velocity - 2 * Vector3.Dot(global.F.Normalized(), v.Velocity) * global.F.Normalized());
+                    }
+                }
+                #endregion
+
+                #region Respawning
+                if (v.Scale.Length <= 0.005) // This checks to see if the ball has shrunk down to non-existance
+                {
+                    // Resets it's variables
+                    v.Scale = v.resetScale;
+                    v.Position = new Vector3(global.speedX, global.speedY, global.speedZ);
+                    v.Velocity = new Vector3(global.speedX, global.speedY, global.speedZ);
+                }
+                if (v.Position.Y <= -4.3f) // Same goes for if the ball reaches the bottom
+                {
+                    v.Position = new Vector3(global.speedX, global.speedY, global.speedZ);
+                    v.Velocity = new Vector3(global.speedX, global.speedY, global.speedZ);
+                }
+                #endregion
+
+                #region Deathball Collisions
+                // Simple ball to deathball collision
+                Vector3 collisionVector = global.deathBallPos - v.Position;
+                if (collisionVector.Length <= (global.deathBallScale.Length + v.Scale.Length) / 1.2f)
+                {
+                    v.Scale.X += global.scaling; // Reducing the scale of the ball for every frame it is colliding with the deathball
+                    v.Scale.Y += global.scaling;
+                    v.Scale.Z += global.scaling;
+                }
+                #endregion
+
+                #region Column Wall Collisions
+                // Very basic collisions with the column walls
+                if (v.Position.Y + (v.Scale.Length / 1.5f) > 0.5) // Highest point collision
+                {
+                    v.Position = global.PrevBallPos;
+                    v.Velocity.Y = -v.Velocity.Y;
+                }
+                if (v.Position.X + (v.Scale.Length / 1.5f) > 0.5) // Both X-axis collision
+                {
+                    v.Position = global.PrevBallPos;
+                    v.Velocity.X = -v.Velocity.X;
+                }
+                if (v.Position.X - (v.Scale.Length / 1.5f) < -0.5)
+                {
+                    v.Position = global.PrevBallPos;
+                    v.Velocity.X = -v.Velocity.X;
+                }
+                if (v.Position.Z + (v.Scale.Length / 1.5f) > 0.5) // Both Z-axis collision
+                {
+                    v.Position = global.PrevBallPos;
+                    v.Velocity.Z = -v.Velocity.Z;
+                }
+                if (v.Position.Z - (v.Scale.Length / 1.5f) < -0.5)
+                {
+                    v.Position = global.PrevBallPos;
+                    v.Velocity.Z = -v.Velocity.Z;
+                }
+                #endregion
+            }
+
+            foreach (Objects v in global.objects) // Calculates the matrix and view projection of every object based on the camera position and updates them when the camera moves
+            {
+                v.CalculateModelMatrix();
+                v.ViewProjectionMatrix = global.cam.GetViewMatrix() * Matrix4.CreatePerspectiveFieldOfView(1.3f, ClientSize.Width / (float)ClientSize.Height, 0.01f, 64.0f);
+                v.ModelViewProjectionMatrix = v.ModelMatrix * v.ViewProjectionMatrix;
+            }
+
+            // Final standard GL stuff
+            GL.UseProgram(global.shaders[global.activeShader].ProgramID);
+
+            GL.BindBuffer(BufferTarget.ArrayBuffer, 0);
+
+            GL.BindBuffer(BufferTarget.ElementArrayBuffer, global.ibo_elements);
+            GL.BufferData(BufferTarget.ElementArrayBuffer, (IntPtr)(global.indicedata.Length * sizeof(int)), global.indicedata, BufferUsageHint.StaticDraw);
+
+        }
+
+        protected override void OnUnload(EventArgs e)
+        {
+            GL.BindBuffer(BufferTarget.ArrayBuffer, 0);
+            GL.BindBuffer(BufferTarget.ElementArrayBuffer, 0);
+            GL.BindVertexArray(0);
+            GL.DeleteBuffers(global.indicedata.Length, global.indicedata);
+            GL.DeleteVertexArray(global.vertdata.Length);
+            global.shaders[global.activeShader].DisableVertexAttribArrays();
+            global.shaders[global.activeShader].Delete();
+            base.OnUnload(e);
+        }
+    }
+}

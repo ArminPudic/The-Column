@@ -1,0 +1,58 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using OpenTK;
+
+namespace Labs.ACW
+{
+    public class Globals
+    {
+        public Globals()
+        {
+
+        }
+        public Camera cam = new Camera();
+        public Dictionary<string, ShaderProgram> shaders = new Dictionary<string, ShaderProgram>(); // Stores all the shaders that are loaded
+        public Dictionary<string, int> textures = new Dictionary<string, int>(); // Stores all the textures that are loaded
+        public string activeShader = "default";
+        public int ibo_elements;
+        public int smallBallCount = 1;
+        public int bigBallCount = 1;
+        public int vertcount;
+        public int camera = 1;
+        public float time = 0.0f;
+        public Vector2 lastMousePos = new Vector2();
+        public Vector2[] texcoorddata;
+        public Vector3[] vertdata;
+        public Vector3[] coldata;
+        public List<Vector2> texcoords = new List<Vector2>();
+        public List<Objects> objects = new List<Objects>(); // Stores all the objects that will be drawn on screen
+        public List<Objects> balls = new List<Objects>();
+        public List<Objects> Xcylinders = new List<Objects>(); // Stores all the X-axis aligned Cylinders
+        public List<Objects> Zcylinders = new List<Objects>(); // Stores all the Z-axis aligned Cylinders
+        public List<Vector3> verts = new List<Vector3>();
+        public List<int> inds = new List<int>();
+        public List<Vector3> colors = new List<Vector3>();
+        public int[] indicedata;
+        public Timer mTimer = new Timer();
+        public Vector3 deathBallPos = new Vector3(0f, -3f, 0f);
+        public Vector3 deathBallScale = new Vector3(0.3f, 0.3f, 0.3f);
+        public Vector3 accelerationDueToGravity = new Vector3(0, -0.2f, 0);
+        public float scaling = -0.005f;
+        public Vector3 L1 = new Vector3(); // The lower point of a cylinder
+        public Vector3 L2 = new Vector3(); // The upper point of a cylinder
+        public Vector3 normal2 = new Vector3();
+        public Vector3 A = new Vector3();
+        public Vector3 F = new Vector3();
+        public Vector3 PrevBallPos;
+        public Vector3 ballCollisionVector;
+        public Vector3 normal;
+        public Matrix4 mView = new Matrix4();
+        public Random rnd = new Random();
+        public float speedX;
+        public float speedY;
+        public float speedZ;
+    }
+}
