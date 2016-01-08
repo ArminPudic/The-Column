@@ -11,9 +11,13 @@ The third obstacle is the death ball. The balls collide with the deathball but r
 The final part of the column is a teleporter. The teleporter instantly moves the ball entering it back to the top of the column. The ball retains its velocity and size when coming out of the teleporter back at the top allowing it to keep going and keep gaining momentum.
 
 There are several cameras in the program:
+
 -An fps-like free camera
+
 -A static camera that allows you to see the entire column
+
 -A scrolling camera that scrolls down the column slowly and loops back to the top when reaching the bottom
+
 -A follow camera that follows and is locked to one of the balls
 
 The program was created in OpenGL using OpenTK and C#. The shaders were done using GLSL that all the textured objects use.
